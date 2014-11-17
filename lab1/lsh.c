@@ -30,6 +30,8 @@
 void PrintCommand(int, Command *);
 void PrintPgm(Pgm *);
 void stripwhite(char *);
+void ExecutePgm(Command *);
+void ExecutePipe(Pgm *);
 
 /* When non-zero, this global means the user is done using this program. */
 int done = 0;
@@ -48,7 +50,7 @@ int main(void)
   while (!done) {
 
     char *line;
-    line = readline("> ");
+    line = readline("$ ");
 
     if (!line) {
       /* Encountered EOF at top level */
@@ -66,7 +68,8 @@ int main(void)
         add_history(line);
         /* execute it */
         n = parse(line, &cmd);
-        PrintCommand(n, &cmd);
+        //PrintCommand(n, &cmd);
+	ExecutePgm(&cmd);
       }
     }
     
@@ -75,6 +78,42 @@ int main(void)
     }
   }
   return 0;
+}
+
+void
+ExecutePgm(Command *cmd)
+{
+  if(strcmp("exit",cmd->pgm->pgmlist[0]) == 0) {
+    printf("Exiting shell...\n");
+    exit(0);
+  } else {
+    pid_t childpid;
+    
+    childpid = fork();
+
+    if (childpid < 0) {
+      fprintf(stderr, "Fork failed");
+    } else if (childpid == 0) {
+
+      if (cmd->pgm->next == NULL) {
+ 	char **mycmd = cmd->pgm->pgmlist;
+	execvp(*mycmd,mycmd);
+	printf("%s -- command not found.\n", *mycmd);
+      } else {
+	ExecutePipe(cmd->pgm);
+	printf("PIPE!!!\n");
+      }
+
+    } else {
+      if (cmd->bakground == 1)
+	return;
+      waitpid(childpid,NULL,0);
+      
+      //printf("Childprocess is dead.");
+    }
+  }
+  
+  
 }
 
 /*
