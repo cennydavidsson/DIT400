@@ -90,20 +90,13 @@ signal(SIGINT, SIG_IGN);
 
 void 
 SignalHandler(int sig) {
-  //  printf("signal\n");
-signal(SIGINT, SIG_IGN);
+  // Ignore Ctrl-C for now
+  signal(SIGINT, SIG_IGN);
+  // Kill the running process
   kill(runningprocess,1);
-
   printf("\n");
-signal(SIGINT, SignalHandler);
-  
-  // if cmd->pgm är null
-  // do nothing
-
-  // cmd->backround 1
-  // Do nothing
-
-  // Else terminate cmd
+  // Restore the default
+  signal(SIGINT, SignalHandler);
 }
 
 void
@@ -124,8 +117,8 @@ ExecutePgm(Command *cmd)
     pid_t childpid;
     childpid = fork();
     if (cmd->bakground == 0) {
-	signal(SIGINT, SignalHandler);
 	runningprocess = childpid;
+	signal(SIGINT, SignalHandler);
     }
 
 
@@ -167,8 +160,8 @@ ExecutePgm(Command *cmd)
 	  printf("%s -- command not found.\n", *mycmd);
 	}
       } else {
-	//ExecutePipe(cmd->pgm);
-	printf("PIPE!!!\n");
+	ExecutePipe(cmd->pgm);
+	//printf("PIPE!!!\n");
       }
 
     } else {
@@ -179,10 +172,41 @@ ExecutePgm(Command *cmd)
       signal(SIGINT, SIG_IGN);
       //printf("Childprocess is dead.");
     }
-  
-  
-  
 }
+
+void
+ExecutePipe(Pgm *p)
+{
+  int fd[2];
+  pid_t childpid;
+
+  pipe(fd);
+  
+  childpid = fork();
+
+  if (childpid == 0) {
+    //write to pipe -- set up stdout first ?
+    dup2(fd[0], 0);
+    close(fd[1]);
+    char **mycmd2 = p->pgmlist;
+    execvp(*mycmd2,mycmd2);
+    
+  } else {
+    //read from pipe --setup first ?
+    dup2(fd[1], 1);
+    close(fd[0]);
+    if (p->next == NULL) {  
+      char **mycmd3 = p->next->pgmlist;
+      execvp(*mycmd3,mycmd3);
+    } else {
+      ExecutePipe(p->next);
+    }
+    
+  }
+
+
+}
+
 
 /*
  * Name: PrintCommand
