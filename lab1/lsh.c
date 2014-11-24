@@ -37,6 +37,8 @@ void ExecutePgm(Command *);
 void ExecutePipe(Pgm *);
 void SignalHandler(int);
 
+
+/* Needed to kill a process with Ctrl-C */
 pid_t runningprocess;
 
 /* When non-zero, this global means the user is done using this program. */
@@ -53,7 +55,8 @@ int main(void)
   Command cmd;
   int n;
 
-signal(SIGINT, SIG_IGN);
+  /* Default behaviour is to ignore Ctrl-C */
+  signal(SIGINT, SIG_IGN);
 
   while (!done) {
 
@@ -90,26 +93,27 @@ signal(SIGINT, SIG_IGN);
 
 void 
 SignalHandler(int sig) {
-  // Ignore Ctrl-C for now
+  /* Ignore Ctrl-C for now */
   signal(SIGINT, SIG_IGN);
-  // Kill the running process
+  /* Kill the running process */
   kill(runningprocess,1);
   printf("\n");
-  // Restore the default
+  /* Restore the default */
   signal(SIGINT, SignalHandler);
 }
 
 void
 ExecutePgm(Command *cmd)
 {
+  /* Built-in 'exit'-command */
   if(strcmp("exit",cmd->pgm->pgmlist[0]) == 0) {
     printf("Exiting shell...\n");
     exit(0);
-  } 
+  }
+  /* Built-in 'cd'-command */
   if (strcmp("cd",cmd->pgm->pgmlist[0]) == 0) {
     if (chdir(cmd->pgm->pgmlist[1]) == -1) {
-      //error
-      
+      perror("Error");
     }
     return;
   }
@@ -126,7 +130,7 @@ ExecutePgm(Command *cmd)
       fprintf(stderr, "Fork failed");
     } else if (childpid == 0) {
 
-      // Stdin
+      /* Replace STDIN with file */
       if (cmd->rstdin != NULL) {
 	int inputfd = -1;
 
@@ -136,11 +140,11 @@ ExecutePgm(Command *cmd)
 	  printf("open(2) file failed: %s\n ", cmd->rstdin);
 	  exit(EXIT_FAILURE);
 	}
-	dup2(inputfd,STDIN_FILENO);
+	dup2(inputfd,0);
 	close(inputfd);
       }
 
-      // Stdout
+      /* Replace STDOUT with file */
       if (cmd->rstdout != NULL) {
 	int outputfd = -1;
  
@@ -150,7 +154,7 @@ ExecutePgm(Command *cmd)
 	  printf("open(2) file failed: %s\n ", cmd->rstdout);
 	  exit(EXIT_FAILURE);
 	}
-	dup2(outputfd,STDOUT_FILENO);
+	dup2(outputfd,1);
 	close(outputfd);
       }
       
@@ -185,14 +189,12 @@ ExecutePipe(Pgm *p)
   childpid = fork();
 
   if (childpid == 0) {
-    //write to pipe -- set up stdout first ?
     dup2(fd[0], 0);
     close(fd[1]);
     char **mycmd2 = p->pgmlist;
     execvp(*mycmd2,mycmd2);
     
   } else {
-    //read from pipe --setup first ?
     dup2(fd[1], 1);
     close(fd[0]);
     if (p->next == NULL) {  
@@ -201,9 +203,8 @@ ExecutePipe(Pgm *p)
     } else {
       ExecutePipe(p->next);
     }
-    
+    wait(NULL);
   }
-
 
 }
 
