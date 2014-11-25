@@ -105,6 +105,7 @@ SignalHandler(int sig) {
 void
 ExecutePgm(Command *cmd)
 {
+
   /* Built-in 'exit'-command */
   if(strcmp("exit",cmd->pgm->pgmlist[0]) == 0) {
     printf("Exiting shell...\n");
@@ -117,65 +118,72 @@ ExecutePgm(Command *cmd)
     }
     return;
   }
-  
-    pid_t childpid;
-    childpid = fork();
-    if (cmd->bakground == 0) {
-	runningprocess = childpid;
-	signal(SIGINT, SignalHandler);
-    }
 
+  /* Fork the childprocess */
+  pid_t childpid;
+  childpid = fork();
 
-    if (childpid < 0) {
-      fprintf(stderr, "Fork failed");
-    } else if (childpid == 0) {
+  /* If it's not a background-process, overrite default-behaviour for Ctrl-C */
+  if (cmd->bakground == 0) {
+    runningprocess = childpid;
+    signal(SIGINT, SignalHandler);
+  }
 
-      /* Replace STDIN with file */
-      if (cmd->rstdin != NULL) {
-	int inputfd = -1;
+  if (childpid < 0) {
+    fprintf(stderr, "Fork failed");
+  } else if (childpid == 0) {
 
-	inputfd = open(cmd->rstdin, O_RDONLY);
+    /* Replace STDIN with file */
+    if (cmd->rstdin != NULL) {
+      int inputfd = -1;
 
-	if (inputfd < 0) {
-	  printf("open(2) file failed: %s\n ", cmd->rstdin);
-	  exit(EXIT_FAILURE);
-	}
-	dup2(inputfd,0);
-	close(inputfd);
+      inputfd = open(cmd->rstdin, O_RDONLY);
+
+      if (inputfd < 0) {
+	printf("open(2) file failed: %s\n ", cmd->rstdin);
+	exit(EXIT_FAILURE);
       }
-
-      /* Replace STDOUT with file */
-      if (cmd->rstdout != NULL) {
-	int outputfd = -1;
+      dup2(inputfd,0);
+      close(inputfd);
+    }
+    /* Replace STDOUT with file */
+    if (cmd->rstdout != NULL) {
+      int outputfd = -1;
  
-	outputfd = open(cmd->rstdout, O_RDWR | O_CREAT, 00640);
+      outputfd = open(cmd->rstdout, O_RDWR | O_CREAT, 00640);
 
-	if (outputfd < 0) {
-	  printf("open(2) file failed: %s\n ", cmd->rstdout);
-	  exit(EXIT_FAILURE);
-	}
-	dup2(outputfd,1);
-	close(outputfd);
+      if (outputfd < 0) {
+	printf("open(2) file failed: %s\n ", cmd->rstdout);
+	exit(EXIT_FAILURE);
       }
-      
-      if (cmd->pgm->next == NULL) {
- 	char **mycmd = cmd->pgm->pgmlist;
-	if (execvp(*mycmd,mycmd) == -1) {
-	  printf("%s -- command not found.\n", *mycmd);
-	}
-      } else {
-	ExecutePipe(cmd->pgm);
-	//printf("PIPE!!!\n");
-      }
-
-    } else {
-
-      if (cmd->bakground == 1)
-	return;
-      waitpid(childpid,NULL,0);
-      signal(SIGINT, SIG_IGN);
-      //printf("Childprocess is dead.");
+      dup2(outputfd,1);
+      close(outputfd);
     }
+    
+    /* If no pipes are used, execute the command. Otherwise call ExecutePipe-function to handle pipes */
+    if (cmd->pgm->next == NULL) {
+      char **cmd2ex = cmd->pgm->pgmlist;
+      /* Print error, if something has gone wrong with the execution of the command */
+      if (execvp(*cmd2ex,cmd2ex) == -1) {
+	perror("command not found");
+	exit(EXIT_FAILURE);
+      }
+    } else {
+      ExecutePipe(cmd->pgm);
+    }
+
+  } else {
+    /* Don't wait, until the process is terminated */
+    if (cmd->bakground == 1)
+      return;
+
+    waitpid(childpid,NULL,0);
+
+    /* Go back back to the default-behaviour for Ctrl-C */
+    signal(SIGINT, SIG_IGN);
+  }
+    if (cmd->bakground == 1)
+      return;
 }
 
 void
@@ -189,21 +197,36 @@ ExecutePipe(Pgm *p)
   childpid = fork();
 
   if (childpid == 0) {
-    dup2(fd[0], 0);
-    close(fd[1]);
-    char **mycmd2 = p->pgmlist;
-    execvp(*mycmd2,mycmd2);
-    
-  } else {
+    /* child process, i.e. the one writing to the pipe */
     dup2(fd[1], 1);
     close(fd[0]);
-    if (p->next == NULL) {  
-      char **mycmd3 = p->next->pgmlist;
-      execvp(*mycmd3,mycmd3);
+    close(fd[1]);
+    
+    /* If no more pipes are coming, execute command. Call the function recursively otherwise. */
+    if (p->next->next == NULL) {
+      char **childcmd = p->next->pgmlist;
+      if (execvp(*childcmd,childcmd) == -1) {
+	perror("command not found");
+	exit(EXIT_FAILURE);
+      }
     } else {
       ExecutePipe(p->next);
     }
-    wait(NULL);
+    
+  } else {
+    /* parent process, i.e. the one reading from the pipe */
+    dup2(fd[0], 0);
+    close(fd[0]);
+    close(fd[1]);
+    char **parentcmd = p->pgmlist;
+    if (execvp(*parentcmd,parentcmd) == -1) {
+      perror("command not found");
+      exit(EXIT_FAILURE);
+    }
+
+    int stat;
+    while (wait(&stat) > 0)
+      {} 
   }
 
 }
