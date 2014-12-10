@@ -50,8 +50,6 @@ static long long idle_ticks;    /* # of timer ticks spent idle. */
 static long long kernel_ticks;  /* # of timer ticks in kernel threads. */
 static long long user_ticks;    /* # of timer ticks in user programs. */
 
-static long long sleep_ticks;  /* # of timer ticks thread has left before it can wake up again */
-
 /* Scheduling. */
 #define TIME_SLICE 4            /* # of timer ticks to give each thread. */
 static unsigned thread_ticks;   /* # of timer ticks since last yield. */
@@ -100,6 +98,7 @@ thread_init (void)
   init_thread (initial_thread, "main", PRI_DEFAULT);
   initial_thread->status = THREAD_RUNNING;
   initial_thread->tid = allocate_tid ();
+  initial_thread->sleepticks = 0;
 }
 
 /* Starts preemptive thread scheduling by enabling interrupts.
@@ -119,21 +118,6 @@ thread_start (void)
   sema_down (&idle_started);
 }
 
-/* Sets the # of ticks a thread has to wait until it can be woken up */
-void
-thread_setTicks (int64_t ticks)
-{
-  sleep_ticks = ticks;
-}
-
-/* Returns, if a blocked thread has waited long enough to be 
-   woken up by thread_unblock() */
-bool
-thread_readyToWakeUp ()
-{
-  return (sleep_ticks == 0);
-}
-
 /* Called by the timer interrupt handler at each timer tick.
    Thus, this function runs in an external interrupt context. */
 void
@@ -150,13 +134,17 @@ thread_tick (void)
 #endif
   else
     kernel_ticks++;
-
-  if (sleep_ticks > 0)
-    sleep_ticks--;
-
+  
   /* Enforce preemption. */
   if (++thread_ticks >= TIME_SLICE)
     intr_yield_on_return ();
+  
+  /* Decrease ticks */
+  if (t->status == THREAD_BLOCKED)
+    t->sleepticks--;
+  
+  if (t->sleepticks <= 0)
+    ;
 }
 
 /* Prints thread statistics. */

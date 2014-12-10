@@ -89,13 +89,26 @@ timer_elapsed (int64_t then)
 void
 timer_sleep (int64_t ticks) 
 {
+  if (ticks < 0)
+    return;
+
   int64_t start = timer_ticks ();
 
-  //thread_setTicks (ticks);
+  struct semaphore timersem;
+  sema_init(&timersem, 1);
+  sema_down(&timersem);
+  
+  struct thread *t = thread_current();
+  thread_block();
+  t->sleepticks = 0;
+  t->timerticks = ticks;
+  
 
   ASSERT (intr_get_level () == INTR_ON);
-  while (timer_elapsed (start) < ticks) 
-    thread_yield ();
+  //  while (timer_elapsed (start) < ticks) 
+  //  thread_yield ();
+
+  //lock_release(&timerlock);
 }
 
 /* Sleeps for approximately MS milliseconds.  Interrupts must be
