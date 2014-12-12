@@ -139,12 +139,11 @@ thread_tick (void)
   if (++thread_ticks >= TIME_SLICE)
     intr_yield_on_return ();
   
-  /* Decrease ticks */
-  if (t->status == THREAD_BLOCKED)
+  /* Decrease ticks 
+  if (t->status == THREAD_BLOCKED && t->sleepticks > 0) {
     t->sleepticks--;
-  
-  if (t->sleepticks <= 0)
-    ;
+    //printf("Sleepticks left: " PRId64 "\n", t->sleepticks);
+    }  */
 }
 
 /* Prints thread statistics. */
@@ -344,8 +343,11 @@ thread_foreach (thread_action_func *func, void *aux)
     {
       struct thread *t = list_entry (e, struct thread, allelem);
       func (t, aux);
+      //func(t);
     }
 }
+
+
 
 /* Sets the current thread's priority to NEW_PRIORITY. */
 void

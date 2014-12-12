@@ -7,6 +7,8 @@
 #include "threads/interrupt.h"
 #include "threads/synch.h"
 #include "threads/thread.h"
+
+void thread_action (struct thread *t, void *aux);
   
 /* See [8254] for hardware details of the 8254 timer chip. */
 
@@ -89,26 +91,23 @@ timer_elapsed (int64_t then)
 void
 timer_sleep (int64_t ticks) 
 {
-  if (ticks < 0)
+  if (ticks <= 0)
     return;
 
   int64_t start = timer_ticks ();
-
-  struct semaphore timersem;
-  sema_init(&timersem, 1);
-  sema_down(&timersem);
   
+  /* Turn interrupts off (needed for thread_block() */
+  intr_set_level(INTR_OFF);
+  ASSERT (intr_get_level () == INTR_OFF);
+
+  /* Set the time the thread should sleep and block it */
   struct thread *t = thread_current();
+  t->sleepticks = ticks;
   thread_block();
-  t->sleepticks = 0;
-  t->timerticks = ticks;
-  
 
-  ASSERT (intr_get_level () == INTR_ON);
   //  while (timer_elapsed (start) < ticks) 
   //  thread_yield ();
 
-  //lock_release(&timerlock);
 }
 
 /* Sleeps for approximately MS milliseconds.  Interrupts must be
@@ -187,7 +186,24 @@ timer_interrupt (struct intr_frame *args UNUSED)
 {
   ticks++;
   thread_tick ();
+
+  thread_foreach (&thread_action, NULL);
+
 }
+
+void
+thread_action (struct thread *t, void *aux)
+{
+  if (t->sleepticks > 0) {
+    t->sleepticks--;
+  }
+  if (t->status == THREAD_BLOCKED && t->sleepticks <= 0) {
+      ASSERT (t->status == THREAD_BLOCKED);
+      thread_unblock(t);
+      t->sleepticks = 0;
+  }  
+}
+
 
 /* Returns true if LOOPS iterations waits for more than one timer
    tick, otherwise false. */
