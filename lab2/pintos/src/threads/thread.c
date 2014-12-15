@@ -99,6 +99,7 @@ thread_init (void)
   initial_thread->status = THREAD_RUNNING;
   initial_thread->tid = allocate_tid ();
   initial_thread->sleepticks = 0;
+  initial_thread->blockedBySleep = false;
 }
 
 /* Starts preemptive thread scheduling by enabling interrupts.
@@ -343,7 +344,6 @@ thread_foreach (thread_action_func *func, void *aux)
     {
       struct thread *t = list_entry (e, struct thread, allelem);
       func (t, aux);
-      //func(t);
     }
 }
 

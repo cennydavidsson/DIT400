@@ -91,6 +91,7 @@ struct thread
     int priority;                       /* Priority. */
     struct list_elem allelem;           /* List element for all threads list. */
     int64_t sleepticks;                 /* # of ticks a thread has left, before it can be woken up */
+    bool blockedBySleep;                /* Indicates, if a thread was blocked by timer_sleep() */
 
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */

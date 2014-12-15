@@ -103,6 +103,7 @@ timer_sleep (int64_t ticks)
   /* Set the time the thread should sleep and block it */
   struct thread *t = thread_current();
   t->sleepticks = ticks;
+  t->blockedBySleep = true;
   thread_block();
 
   //  while (timer_elapsed (start) < ticks) 
@@ -197,10 +198,11 @@ thread_action (struct thread *t, void *aux)
   if (t->sleepticks > 0) {
     t->sleepticks--;
   }
-  if (t->status == THREAD_BLOCKED && t->sleepticks <= 0) {
+  if (t->status == THREAD_BLOCKED && t->sleepticks <= 0 && t->blockedBySleep) {
       ASSERT (t->status == THREAD_BLOCKED);
       thread_unblock(t);
       t->sleepticks = 0;
+      t->blockedBySleep = false;
   }  
 }
 
