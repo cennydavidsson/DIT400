@@ -50,8 +50,8 @@ void oneTask(task_t task);/*Task requires to use the bus and executes methods be
 void setDirection(int);
 
 
-static unsigned int numHighPrio_send;      /* Number of high priority sender tasks */
-static unsigned int numHighPrio_receive;   /* Number of high priority receiver tasks */
+static unsigned int numHighPrio_send;      /* Number of remaining high priority sender tasks */
+static unsigned int numHighPrio_receive;   /* Number of remaining high priority receiver tasks */
 static int busdir;                      /* Direction of the bus */
 
 /* initializes semaphores */ 
