@@ -5,12 +5,12 @@
 			|   DESIGN DOCUMENT  |
 			+--------------------+
 				   
----- GROUP XX ----
+---- GROUP A16 ----
 
 >> Fill in the group number, names and email addresses of your group members.
 
 Cenny Davidsson <Cenny@me.com>
-FirstName LastName <email@domain.example>
+Patrick Franz <gusfranpa@student.gu.se>
 
 ---- PRELIMINARIES ----
 
@@ -34,21 +34,15 @@ A1:
 struct thread
   {
     /* Owned by thread.c. */
-    tid_t tid;                          
-    enum thread_status status;          
-    char name[16];                      
-    uint8_t *stack;                     
-    int priority;                       
-    struct list_elem allelem;           
-    int64_t sleepticks;                 /* # of ticks a thread has left, before it can be woken up */
-    bool blockedBySleep;                /* Indicates, if a thread was blocked by timer_sleep() */
-    struct list_elem elem;              
+[...]
 
-#ifdef USERPROG
-    uint32_t *pagedir;                
-#endif
-    unsigned magic;                     
-  };
+    int64_t sleepticks; 		/* # of ticks a thread has left, before it can be woken up */
+    bool blockedBySleep;                /* Indicates, if a thread was blocked by timer_sleep() */
+
+[...]
+    
+}
+    
 
 ---- ALGORITHMS ----
 
@@ -93,25 +87,60 @@ we tried did not simply work.
 >> `struct' member, global or static variable, semaphore, `typedef', or
 >> enumeration.  Identify the purpose of each in 25 words or less.
 
+struct semaphore busslot >> Used to ensure, that no more than 3 threads are using the bus
+struct semaphore sendPrioLow >> Used to indicate, if high priority sender tasks are remaining
+struct semaphore receivePrioLow >> Used to indicate, if high priority receiver tasks are remaining
+struct semaphore varHighPrio_send >> Used to prevent race-conditions for variable 'highPrio_receive
+struct semaphore varHighPrio_receive >> Used to prevent race-conditions for variable 'highPrio_send'
+struct semaphore varBusdir >> Used to prevent race-conditions for variable 'busdir'
+struct semaphore direction >> Used to make threads wait, until the direction is right for the thread
+
+static unsigned int numHighPrio_send >> Number of remaining high priority sender tasks
+static unsigned int numHighPrio_receive >> Number of remaining high priority receiver tasks
+static int busdir >> Direction of the bus
+
 ---- SYNCHRONIZATION ----
 
 >> C1: How does your solution guarantee that no more that 3 tasks
 >> are using the bus in the same direction?
 
+We use a semaphore (called busslot) with value 3. Any task must first acquire this semaphore.
+
 >> C2: What prevents tasks from opposite directions from using the
 >> bus simultaneously?
 
+Before a task can acquire the semaphore 'busslot', we check, if the bus is either empty
+or if the direction is ok to use. If it is not, the task must first acquire a semaphore (direction),
+before it can continue. This semaphore is only released, if the bus is empty.
+So a task from opposite direction has to wait, until the bus is empty.
+
 >> C3: How does your solution grant priority to high priority tasks over
 >> the waiting tasks in the same direction?
+
+Before a low-priority task can acquire the semaphore 'busslot', we check if there are high priority
+tasks remaining (we have a static variable for both send- and receive-tasks). When this variable is 0
+(e.g. there are no remaining high priority tasks), a low priority tasks can acquire a semaphore (called 
+sendPrioLow resp. receivePrioLow), which is not available, if there are high priority tasks remaining.
 
 >> C4: How do you guarantee that despite having priority, high priority
 >> tasks do not start using the bus while there are still still using
 >> it in the oposite direction?
 
+See also question C2. Before we check a task's priority, we first check the direction of the bus.
+If there are tasks from the opposite direction using the bus, the task has to wait independent of its
+priority.
+
 ---- RATIONALE ----
 
 >> C6: Why did you choose this design? Did you consider other design 
 >> alternatives? In what ways is it superior to another design you considered?
+
+We tried other designs first, but we always ran into problems that were too big or too complicated to overcome.
+We then got parts working with this design and it slowly developed into its final version.
+
+Some parts of our design may not seem elegant at all, but we use very few different "techniques". So a lot
+of our code looks somewhat similar.
+ 
 
 
 			   SURVEY QUESTIONS (optional)
@@ -125,6 +154,9 @@ the quarter.
 
 >> In your opinion, was this assignment, or any one of the three problems
 >> in it, too easy or too hard?  Did it take too long or too little time?
+
+We think, that the difficulty of all problems was fine...neither too easy nor too hard.
+It also did not take an unreasonable amount of time to solve the problems.
 
 >> Did you find that working on a particular part of the assignment gave
 >> you greater insight into some aspect of OS design?
