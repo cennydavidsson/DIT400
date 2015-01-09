@@ -91,6 +91,7 @@ timer_elapsed (int64_t then)
 void
 timer_sleep (int64_t ticks) 
 {
+  /* If the number is negative or 0, simply return */
   if (ticks <= 0)
     return;
 
@@ -105,10 +106,6 @@ timer_sleep (int64_t ticks)
   t->sleepticks = ticks;
   t->blockedBySleep = true;
   thread_block();
-
-  //  while (timer_elapsed (start) < ticks) 
-  //  thread_yield ();
-
 }
 
 /* Sleeps for approximately MS milliseconds.  Interrupts must be
@@ -180,7 +177,7 @@ timer_print_stats (void)
 {
   printf ("Timer: %"PRId64" ticks\n", timer_ticks ());
 }
-
+
 /* Timer interrupt handler. */
 static void
 timer_interrupt (struct intr_frame *args UNUSED)

@@ -25,12 +25,13 @@ typedef struct {
 } task_t;
 
 
-struct semaphore busslot;              
+struct semaphore busslot;              /* Used to ensure, that no more than 3 threads are using the bus */
 struct semaphore sendPrioLow;          /* Used to indicate, if high priority sender tasks are remaining */
 struct semaphore receivePrioLow;       /* Used to indicate, if high priority receiver tasks are remaining */
 struct semaphore varHighPrio_send;     /* Used to prevent race-conditions for variable 'highPrio_receive */
 struct semaphore varHighPrio_receive;  /* Used to prevent race-conditions for variable 'highPrio_send' */
 struct semaphore varBusdir;            /* Used to prevent race-conditions for variable 'busdir' */
+struct semaphore direction;            /* Used to make threads wait, until the direction is right for the thread */
 
 void batchScheduler(unsigned int num_tasks_send, unsigned int num_task_receive,
         unsigned int num_priority_send, unsigned int num_priority_receive);
@@ -49,8 +50,8 @@ void oneTask(task_t task);/*Task requires to use the bus and executes methods be
 void setDirection(int);
 
 
-static unsigned int highPrio_send;      /* Number of high priority sender tasks */
-static unsigned int highPrio_receive;   /* Number of high priority receiver tasks */
+static unsigned int numHighPrio_send;      /* Number of high priority sender tasks */
+static unsigned int numHighPrio_receive;   /* Number of high priority receiver tasks */
 static int busdir;                      /* Direction of the bus */
 
 /* initializes semaphores */ 
@@ -72,9 +73,11 @@ void init_bus(void){
     sema_down(&receivePrioLow);
 
     sema_init(&varBusdir,1);
+    sema_init(&direction,1);
 
-    highPrio_send = 0;
-    highPrio_receive = 0;
+    /* Initialize static variables */
+    numHighPrio_send = 0;
+    numHighPrio_receive = 0;
     busdir = -1;
 }
 
@@ -93,16 +96,16 @@ void batchScheduler(unsigned int num_tasks_send, unsigned int num_tasks_receive,
         unsigned int num_priority_send, unsigned int num_priority_receive)
 {
 
-    highPrio_send = num_priority_send;
-    highPrio_receive = num_priority_receive;
+    numHighPrio_send = num_priority_send;
+    numHighPrio_receive = num_priority_receive;
 
     /* If no high priority sender tasks are to be created/remaining, use semaphore 
 	 'sendPrioLow' to indicate that */
-    if (highPrio_send == 0)
+    if (numHighPrio_send == 0)
       sema_up(&sendPrioLow);
     /* If no high priority receiver tasks are to be created/remaining, use semaphore 
 	 'receivePrioLow' to indicate that */
-    if (highPrio_receive == 0)
+    if (numHighPrio_receive == 0)
       sema_up(&receivePrioLow);
 
     unsigned int i;
@@ -159,21 +162,18 @@ void oneTask(task_t task) {
 void getSlot(task_t task) 
 {
 
-    /* Need to add here.
-       if bus-direction is not right, nothing happens.
-       Need to put a thread, that is waiting for the right direction, to wait */
+    /* Make the thread wait, until the direction ok or until the bus is empty */
     if (busdir != task.direction && busslot.value < BUS_CAPACITY) {
-      /* make task wait until direction is ok
-	 probably use a semaphore or 2 to do this */
+      sema_down(&direction);
     }
 
-    /* From here on, it's safe for the task to use the bus,
-       because the direction is either right or the bus is unused */
-    
     if (task.direction == SENDER) {
       if (task.priority == HIGH) {
+	/* Acquire the slot on the bus */
 	sema_down(&busslot);
       } else {
+        /* Acquire the slot on the bus, after all high priority sender tasks
+	   have gotten their slot */
 	sema_down(&sendPrioLow);
 	sema_down(&busslot);
 	sema_up(&sendPrioLow);
@@ -184,8 +184,11 @@ void getSlot(task_t task)
       }
     } else { 
       if (task.priority == HIGH) {
+        /* Acquire the slot on the bus */
 	sema_down(&busslot);
       } else {
+	/* Acquire the slot on the bus, after all high priority receiver tasks
+	   have gotten their slot */
 	sema_down(&receivePrioLow);
 	sema_down(&busslot);
 	sema_up(&receivePrioLow);
@@ -197,29 +200,28 @@ void getSlot(task_t task)
 
     }
     
-
     
     if (task.priority == HIGH && task.direction == SENDER) {
       /* Update the number of remaining high priority sender tasks */
       sema_down(&varHighPrio_send);
-      highPrio_send--;
+      numHighPrio_send--;
       sema_up(&varHighPrio_send);
 
       /* If no high priority sender tasks are remaining, use semaphore 
 	 'sendPrioLow' to indicate that */
-      if (highPrio_send == 0)
+      if (numHighPrio_send == 0)
 	sema_up(&sendPrioLow);
     }
     
     if (task.priority == HIGH && task.direction == RECEIVER) {
       /* Update the number of remaining high priority receiver tasks */
       sema_down(&varHighPrio_receive);
-      highPrio_receive--;
+      numHighPrio_receive--;
       sema_up(&varHighPrio_receive);
 
       /* If no high priority receiver tasks are remaining, use semaphore 
 	 'receivePrioLow' to indicate that */
-      if (highPrio_receive == 0)
+      if (numHighPrio_receive == 0)
 	sema_up(&receivePrioLow);
     }
     
@@ -237,6 +239,11 @@ void transferData(task_t task)
 void leaveSlot(task_t task) 
 {
   sema_up(&busslot);
+
+  /* If the bus is empty, release the semaphore to indicate,
+     that the bus is free to use for whatever direction */
+  if (busslot.value == BUS_CAPACITY)
+    sema_up(&direction);
 }
 
 /* Set the direction of the bus */
