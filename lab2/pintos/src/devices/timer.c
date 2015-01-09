@@ -186,9 +186,9 @@ timer_interrupt (struct intr_frame *args UNUSED)
   thread_tick ();
 
   thread_foreach (&thread_action, NULL);
-
 }
 
+/* Check thread status and decrese ticks or unblock if conditions are met */
 void
 thread_action (struct thread *t, void *aux)
 {

@@ -9,8 +9,7 @@
 
 >> Fill in the group number, names and email addresses of your group members.
 
-FirstName LastName <email@domain.example>
-FirstName LastName <email@domain.example>
+Cenny Davidsson <Cenny@me.com>
 FirstName LastName <email@domain.example>
 
 ---- PRELIMINARIES ----
@@ -26,31 +25,58 @@ FirstName LastName <email@domain.example>
 			     ===========
 
 ---- DATA STRUCTURES ----
-
+A1:
+struct thread
 >> A1: Copy here the declaration of each new or changed `struct' or
 >> `struct' member, global or static variable, `typedef', or
 >> enumeration.  Identify the purpose of each in 25 words or less.
-
----- ALGORITHMS ----
-
+  {
+    /* Owned by thread.c. */
+    tid_t tid;                          
 >> A2: Briefly describe what happens in a call to timer_sleep(),
 >> including the effects of the timer interrupt handler.
-
+    enum thread_status status;          
 >> A3: What steps are taken to minimize the amount of time spent in
 >> the timer interrupt handler?
-
----- SYNCHRONIZATION ----
-
+    char name[16];                      
+    uint8_t *stack;                     
+    int priority;                       
 >> A4: How are race conditions avoided when multiple threads call
 >> timer_sleep() simultaneously?
 
 >> A5: How are race conditions avoided when a timer interrupt occurs
 >> during a call to timer_sleep()?
+    struct list_elem allelem;           
+    int64_t sleepticks;                 /* # of ticks a thread has left, before it can be woken up */
+    bool blockedBySleep;                /* Indicates, if a thread was blocked by timer_sleep() */
+>> A6: Why did you choose this design?  In what ways is it superior to
+>> another design you considered?
+    struct list_elem elem;              
+
+#ifdef USERPROG
+    uint32_t *pagedir;                
+#endif
+    unsigned magic;                     
+  };
+
+---- ALGORITHMS ----
+
+A2: 
+The number of ticks is saved in the modified struct in the timmer_sleep(). In the 
+interupt hanlder we utilize the saved ticks too count down to zero and unblock 
+when that goal is reached.
+
+A3:
+We check the status of the thread to prevent unnecessary CPU usage.
+
+---- SYNCHRONIZATION ----
+
+A4 & A5: No thread is dependent on another thread so race condition is never a problem.
 
 ---- RATIONALE ----
 
->> A6: Why did you choose this design?  In what ways is it superior to
->> another design you considered?
+A6: We chose this design for the simple reason it's easy to reason about and implement. Other designs 
+we tried did not simply work.
 
 			    BATCH SCHEDULING
 			    ================
