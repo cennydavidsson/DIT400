@@ -140,11 +140,6 @@ thread_tick (void)
   if (++thread_ticks >= TIME_SLICE)
     intr_yield_on_return ();
   
-  /* Decrease ticks 
-  if (t->status == THREAD_BLOCKED && t->sleepticks > 0) {
-    t->sleepticks--;
-    //printf("Sleepticks left: " PRId64 "\n", t->sleepticks);
-    }  */
 }
 
 /* Prints thread statistics. */

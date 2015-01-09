@@ -162,7 +162,7 @@ void oneTask(task_t task) {
 void getSlot(task_t task) 
 {
 
-    /* Make the thread wait, until the direction ok or until the bus is empty */
+    /* Make the thread wait, until the direction is ok or until the bus is empty */
     if (busdir != task.direction && busslot.value < BUS_CAPACITY) {
       sema_down(&direction);
     }
